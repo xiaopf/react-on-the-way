@@ -129,7 +129,6 @@ export function processUpdateQueue(workInProgress, nextProps) {
       newState = getStateFromUpdate(workInProgress, queue, update, newState, nextProps);
       update = update.next;
       if (!update) {
-        console.log('update 2 state 过程中可能产生新pendingUpdate，还未处理', queue.shared.pending)
         break;
       }
     } while(true)

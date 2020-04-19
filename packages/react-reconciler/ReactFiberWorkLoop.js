@@ -202,6 +202,7 @@ function commitRoot(root) {
 }
 
 function performUnitOfWork(unitOfWork) {
+  console.log('performUnitOfWork', unitOfWork, unitOfWork.type);
   const current = unitOfWork.alternate;
   // beginWork会返回fiber.child，不存在next意味着深度优先遍历已经遍历到某个子树的最深层叶子节点
   let next = beginWork(current, unitOfWork);

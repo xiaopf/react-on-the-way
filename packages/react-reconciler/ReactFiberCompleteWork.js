@@ -40,6 +40,7 @@ export function appendAllChildren(parent, workInProgress) {
 
 // 为 beginWork阶段生成的fiber生成对应DOM，并产生DOM树
 export function completeWork(current, workInProgress) {
+  console.log('completeWork', workInProgress, workInProgress.type);
   const newProps = workInProgress.pendingProps;
   switch (workInProgress.tag) {
     case HostRoot:

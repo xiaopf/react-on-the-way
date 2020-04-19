@@ -14,7 +14,6 @@ function ReactElement(type, key, props) {
  * @description React.createElement
 */
 export function createElement(type, config, children) {
-  console.log('in cre');
   const props = {};
   if (config) {
     for (propName in config) {
