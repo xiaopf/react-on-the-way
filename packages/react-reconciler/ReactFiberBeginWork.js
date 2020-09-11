@@ -10,10 +10,22 @@ import {
   HostComponent,
   HostText
 } from 'shared/ReactWorkTags';
-import {cloneUpdateQueue, processUpdateQueue} from './ReactUpdateQueue';
-import {reconcileChildFibers, mountChildFibers, cloneChildFibers} from './ReactChildFiber';
-import {renderWithHooks, bailoutHooks} from './ReactFiberHooks';
-import {shouldSetTextContent} from 'reactDOM/ReactHostConfig';
+import {
+  Placement,
+  PerformedWork,
+} from 'shared/ReactSideEffectTags';
+import { cloneUpdateQueue, processUpdateQueue } from './ReactUpdateQueue';
+import { reconcileChildFibers, mountChildFibers, cloneChildFibers } from './ReactChildFiber';
+import { renderWithHooks, bailoutHooks } from './ReactFiberHooks';
+import {
+  mountClassInstance,
+  adoptClassInstance,
+  constructClassInstance,
+  resumeMountClassInstance,
+  updateClassInstance
+} from './ReactFiberClassComponent';
+
+import { shouldSetTextContent } from 'reactDOM/ReactHostConfig';
 import { NoWork } from './ReactFiberExpirationTime';
 
 // 针对没有update需要更新（没有或者优先级不够）的优化路径
@@ -84,6 +96,175 @@ function updateFunctionComponent(current, workInProgress, Component, nextProps, 
   return workInProgress.child;
 }
 
+function updateClassComponent(current,workInProgress,Component,nextProps,renderExpirationTime) {
+  const instance = workInProgress.stateNode;
+  let shouldUpdate;
+  if (instance === null) {
+    if (current !== null) {
+      // A class component without an instance only mounts if it suspended
+      // inside a non-concurrent tree, in an inconsistent state. We want to
+      // treat it like a new mount, even though an empty version of it already
+      // committed. Disconnect the alternate pointers.
+      current.alternate = null;
+      workInProgress.alternate = null;
+      // Since this is conceptually a new fiber, schedule a Placement effect
+      workInProgress.effectTag |= Placement;
+    }
+    // In the initial pass we might need to construct the instance.
+    constructClassInstance(workInProgress, Component, nextProps);
+    mountClassInstance(
+      workInProgress,
+      Component,
+      nextProps,
+      renderExpirationTime,
+    );
+    shouldUpdate = true;
+  } else if (current === null) {
+    // In a resume, we'll already have an instance we can reuse.
+    shouldUpdate = resumeMountClassInstance(
+      workInProgress,
+      Component,
+      nextProps,
+      renderExpirationTime,
+    );
+  } else {
+    shouldUpdate = updateClassInstance(
+      current,
+      workInProgress,
+      Component,
+      nextProps,
+      renderExpirationTime,
+    );
+  }
+  const nextUnitOfWork = finishClassComponent(
+    current,
+    workInProgress,
+    Component,
+    shouldUpdate,
+    false, //hasContext
+    renderExpirationTime,
+  );
+  return nextUnitOfWork;
+}
+
+
+function forceUnmountCurrentAndReconcile(current,workInProgress,nextChildren,renderExpirationTime) {
+  // This function is fork of reconcileChildren. It's used in cases where we
+  // want to reconcile without matching against the existing set. This has the
+  // effect of all current children being unmounted; even if the type and key
+  // are the same, the old child is unmounted and a new child is created.
+  //
+  // To do this, we're going to go through the reconcile algorithm twice. In
+  // the first pass, we schedule a deletion for all the current children by
+  // passing null.
+  workInProgress.child = reconcileChildFibers(
+    workInProgress,
+    current.child,
+    null,
+    renderExpirationTime,
+  );
+  // In the second pass, we mount the new children. The trick here is that we
+  // pass null in place of where we usually pass the current child set. This has
+  // the effect of remounting all children regardless of whether their
+  // identities match.
+  workInProgress.child = reconcileChildFibers(
+    workInProgress,
+    null,
+    nextChildren,
+    renderExpirationTime,
+  );
+}
+
+function finishClassComponent(current,workInProgress,Component,shouldUpdate,hasContext,renderExpirationTime) {
+  // Refs should update even if shouldComponentUpdate returns false
+  // markRef(current, workInProgress);
+
+  // const didCaptureError = (workInProgress.effectTag & DidCapture) !== NoEffect;
+
+  if (!shouldUpdate) {
+    // Context providers should defer to sCU for rendering
+    // if (hasContext) {
+    //   invalidateContextProvider(workInProgress, Component, false);
+    // }
+
+    return bailoutOnAlreadyFinishedWork(
+      current,
+      workInProgress,
+      renderExpirationTime,
+    );
+  }
+
+  const instance = workInProgress.stateNode;
+
+  // Rerender
+  // ReactCurrentOwner.current = workInProgress;
+  let nextChildren;
+  // if (
+  //   typeof Component.getDerivedStateFromError !== 'function'
+  // ) {
+  //   // If we captured an error, but getDerivedStateFromError is not defined,
+  //   // unmount all the children. componentDidCatch will schedule an update to
+  //   // re-render a fallback. This is temporary until we migrate everyone to
+  //   // the new API.
+  //   // TODO: Warn in a future release.
+  //   nextChildren = null;
+
+  //   // if (enableProfilerTimer) {
+  //   //   stopProfilerTimerIfRunning(workInProgress);
+  //   // }
+  // } else {
+      nextChildren = instance.render();
+  // }
+
+  // React DevTools reads this flag.
+  workInProgress.effectTag |= PerformedWork;
+  if (current !== null) {
+    // If we're recovering from an error, reconcile without reusing any of
+    // the existing children. Conceptually, the normal children and the children
+    // that are shown on error are two different sets, so we shouldn't reuse
+    // normal children even if their identities match.
+    forceUnmountCurrentAndReconcile(
+      current,
+      workInProgress,
+      nextChildren,
+      renderExpirationTime,
+    );
+  } else {
+    reconcileChildren(
+      current,
+      workInProgress,
+      nextChildren,
+      renderExpirationTime,
+    );
+  }
+
+  // Memoize state using the values we just used to render.
+  // TODO: Restructure so we never read values from the instance.
+  workInProgress.memoizedState = instance.state;
+
+  // The context might have changed so we need to recalculate it.
+  // if (hasContext) {
+  //   invalidateContextProvider(workInProgress, Component, true);
+  // }
+
+  return workInProgress.child;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function updateHostText(current, workInProgress) {
   return null;
 }
@@ -134,7 +315,7 @@ function updateHostComponent(current, workInProgress, renderExpirationTime) {
 // render阶段开始处理fiber的入口
 // 总体来说该函数会计算新state，返回child
 export default function beginWork(current, workInProgress, renderExpirationTime) {
-  const updateExpirationTime = workInProgress.expirationTime;
+
   if (current) {
     // 非首次渲染
     // 对于FiberRoot，首次渲染也存在current，React是通过expirationTime区分是否走优化路径
@@ -143,7 +324,7 @@ export default function beginWork(current, workInProgress, renderExpirationTime)
 
     if (oldProps !== newProps) {
       didReceiveUpdate = true;
-    } else if (updateExpirationTime < renderExpirationTime) {
+    } else if (workInProgress.updateExpirationTime < renderExpirationTime) {
       // 当前fiber的优先级比较低
       didReceiveUpdate = false;
       return bailoutOnAlreadyFinishedWork(current, workInProgress, renderExpirationTime);
@@ -162,7 +343,7 @@ export default function beginWork(current, workInProgress, renderExpirationTime)
       // 在函数内部会区分具体类型
       // 如果是FunctionCompoennt，下次渲染就会走 updateFunctionComponent
       return mountIndeterminateComponent(current, workInProgress, workInProgress.type, renderExpirationTime);
-    case HostRoot:  
+    case HostRoot:
       return updateHostRoot(current, workInProgress, renderExpirationTime);
     case FunctionComponent:
       const Component = workInProgress.type;
@@ -173,10 +354,18 @@ export default function beginWork(current, workInProgress, renderExpirationTime)
         workInProgress.pendingProps,
         renderExpirationTime
       );
+    case ClassComponent:
+      return updateClassComponent(
+        current,
+        workInProgress,
+        workInProgress.type,
+        workInProgress.pendingProps,
+        renderExpirationTime,
+      );
     case HostComponent:
       return updateHostComponent(current, workInProgress, renderExpirationTime);
     case HostText:
-        return updateHostText(current, workInProgress);
+      return updateHostText(current, workInProgress);
     default:
       break;
   }

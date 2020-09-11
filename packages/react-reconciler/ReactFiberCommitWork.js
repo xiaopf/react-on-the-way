@@ -418,3 +418,139 @@ function commitPassiveHookEffects(finishedWork) {
     }
   }
 }
+
+// export function commitLifeCycles(finishedRoot,current,finishedWork,committedLanes) {
+//   switch (finishedWork.tag) {
+//     case FunctionComponent:
+//     case ForwardRef:
+//     case SimpleMemoComponent:
+//     case Block: {
+//       // At this point layout effects have already been destroyed (during mutation phase).
+//       // This is done to prevent sibling component effects from interfering with each other,
+//       // e.g. a destroy function in one component should never override a ref set
+//       // by a create function in another component during the same commit.
+//       if (
+//         enableProfilerTimer &&
+//         enableProfilerCommitHooks &&
+//         finishedWork.mode & ProfileMode
+//       ) {
+//         try {
+//           startLayoutEffectTimer();
+//           commitHookEffectListMount(HookLayout | HookHasEffect, finishedWork);
+//         } finally {
+//           recordLayoutEffectDuration(finishedWork);
+//         }
+//       } else {
+//         commitHookEffectListMount(HookLayout | HookHasEffect, finishedWork);
+//       }
+
+//       schedulePassiveEffects(finishedWork);
+//       return;
+//     }
+//     case ClassComponent: {
+//       const instance = finishedWork.stateNode;
+//       if (finishedWork.effectTag & Update) {
+//         if (current === null) {
+//           // We could update instance props and state here,
+//           // but instead we rely on them being set during last render.
+//           // TODO: revisit this when we implement resuming.
+//           if (
+//             enableProfilerTimer &&
+//             enableProfilerCommitHooks &&
+//             finishedWork.mode & ProfileMode
+//           ) {
+//             try {
+//               startLayoutEffectTimer();
+//               instance.componentDidMount();
+//             } finally {
+//               recordLayoutEffectDuration(finishedWork);
+//             }
+//           } else {
+//             instance.componentDidMount();
+//           }
+//         } else {
+//           const prevProps =
+//             finishedWork.elementType === finishedWork.type
+//               ? current.memoizedProps
+//               : resolveDefaultProps(finishedWork.type, current.memoizedProps);
+//           const prevState = current.memoizedState;
+//           // We could update instance props and state here,
+//           // but instead we rely on them being set during last render.
+//           // TODO: revisit this when we implement resuming.
+//           if (
+//             enableProfilerTimer &&
+//             enableProfilerCommitHooks &&
+//             finishedWork.mode & ProfileMode
+//           ) {
+//             try {
+//               startLayoutEffectTimer();
+//               instance.componentDidUpdate(
+//                 prevProps,
+//                 prevState,
+//                 instance.__reactInternalSnapshotBeforeUpdate,
+//               );
+//             } finally {
+//               recordLayoutEffectDuration(finishedWork);
+//             }
+//           } else {
+//             instance.componentDidUpdate(
+//               prevProps,
+//               prevState,
+//               instance.__reactInternalSnapshotBeforeUpdate,
+//             );
+//           }
+//         }
+//       }
+
+//       // TODO: I think this is now always non-null by the time it reaches the
+//       // commit phase. Consider removing the type check.
+//       const updateQueue = (finishedWork.updateQueue: any);
+//       if (updateQueue !== null) {
+//         commitUpdateQueue(finishedWork, updateQueue, instance);
+//       }
+//       return;
+//     }
+//     case HostRoot: {
+//       // TODO: I think this is now always non-null by the time it reaches the
+//       // commit phase. Consider removing the type check.
+//       const updateQueue = finishedWork.updateQueue;
+//       if (updateQueue !== null) {
+//         let instance = null;
+//         if (finishedWork.child !== null) {
+//           switch (finishedWork.child.tag) {
+//             case HostComponent:
+//               instance = getPublicInstance(finishedWork.child.stateNode);
+//               break;
+//             case ClassComponent:
+//               instance = finishedWork.child.stateNode;
+//               break;
+//           }
+//         }
+//         commitUpdateQueue(finishedWork, updateQueue, instance);
+//       }
+//       return;
+//     }
+//     case HostComponent: {
+//       const instance = finishedWork.stateNode;
+
+//       // Renderers may schedule work to be done after host components are mounted
+//       // (eg DOM renderer may schedule auto-focus for inputs and form controls).
+//       // These effects should only be committed when components are first mounted,
+//       // aka when there is no current/alternate.
+//       if (current === null && finishedWork.effectTag & Update) {
+//         const type = finishedWork.type;
+//         const props = finishedWork.memoizedProps;
+//         commitMount(instance, type, props, finishedWork);
+//       }
+
+//       return;
+//     }
+//     case HostText: {
+//       // We have no life-cycles associated with text.
+//       return;
+//     }
+//     case HostPortal: {
+//       // We have no life-cycles associated with portals.
+//       return;
+//     }
+// }

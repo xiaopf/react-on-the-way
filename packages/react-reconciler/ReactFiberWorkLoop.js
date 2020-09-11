@@ -402,13 +402,13 @@ function completeUnitOfWork(unitOfWork) {
 // 包裹一层commitRoot，commit使用Scheduler调度
 function commitRoot(root) {
   const renderPriorityLevel = Scheduler.getCurrentPriorityLevel();
-  Scheduler.runWithPriority(Scheduler.ImmediatePriority, commitRootImp.bind(null, root, renderPriorityLevel));
+  Scheduler.runWithPriority(Scheduler.ImmediatePriority, commitRootImpl.bind(null, root, renderPriorityLevel));
 }
 
 // commit阶段的入口，包括如下子阶段：
 // before mutation阶段：遍历effect list，执行 DOM操作前触发的钩子
 // mutation阶段：遍历effect list，执行effect
-function commitRootImp(root) {
+function commitRootImpl(root) {
   do {
     // syncCallback会保存在一个内部数组中，在 flushPassiveEffects 中 同步执行完
     // 由于syncCallback的callback是 performSyncWorkOnRoot，可能产生新的 passive effect
@@ -479,7 +479,9 @@ function commitRootImp(root) {
     nextEffect = firstEffect;
     do {
       try {
+        nextEffect.stateNode && nextEffect.stateNode.componentDidMount &&  nextEffect.stateNode.componentDidMount();
         nextEffect = commitMutationEffects(root, nextEffect);
+        
       } catch(e) {
         console.warn('commit mutaion error', e);
         nextEffect = nextEffect.nextEffect;
@@ -567,12 +569,15 @@ function  performSyncWorkOnRoot(root) {
       break;
     } while (true)
 
+    console.log(1111,root.current === workInProgress)
+
     executionContext = prevExecutionContext;
     root.finishedWork = root.current.alternate;
     root.finishedExpirationTime = expirationTime;
     // render阶段结束，进入commit阶段
     commitRoot(root);
-    ensureRootIsScheduled(root);
+    console.log(2222,root === workInProgress)
+    ensureRootIsScheduled(root.current);
   }
   return null;
 }

@@ -4,6 +4,7 @@ const outputPath = path.resolve(__dirname, "build");
 const packagesPath = path.resolve(__dirname, 'packages');
 
 module.exports = {
+  devtool: "source-map",
   entry: path.resolve(__dirname, `./demo`),
   output: {
     path: outputPath,
